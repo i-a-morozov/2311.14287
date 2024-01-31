@@ -2501,6 +2501,7 @@ class Twiss():
                               forward:bool=True,
                               count:int=256,
                               fraction:float=0.75,
+                              return_matrix:bool=False,
                               verbose:bool=False) -> torch.tensor:
         """
         Estimate twiss from n-turn matrix.
@@ -2559,6 +2560,10 @@ class Twiss():
         locations = range(self.model.monitor_count) if not phony else self.model.virtual_index
         if index != None:
             locations = index
+
+        box_solution = []
+        box_transport = []
+
         for location in locations:
 
             if verbose:
@@ -2590,7 +2595,10 @@ class Twiss():
                 A = torch.stack([qx_n, px_n, qy_n, py_n]).T
                 B = torch.stack([qx_m, px_m, qy_m, py_m]).T
 
-                transport = to_symplectic(torch.linalg.lstsq(A, B).solution.T)
+                solution = torch.linalg.lstsq(A, B).solution.T
+                transport = to_symplectic(solution)
+                box_solution.append(solution)
+                box_transport.append(transport)
                 tune, normal, _ = twiss_compute(transport)
                 if tune is not None:
                     box.append(torch.cat([tune, normal[[0, 2, 1, 3, 0, 2, 0, 3], [0, 2, 0, 2, 2, 0, 3, 0]]]))
@@ -2598,6 +2606,9 @@ class Twiss():
                     box.append(empty)
 
             result.append(torch.stack(box).T)
+        
+        if return_matrix:
+            return torch.stack(result), torch.stack(box_solution), torch.stack(box_transport)
 
         return torch.stack(result)
 
